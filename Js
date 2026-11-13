@@ -1,0 +1,380 @@
+
+const $ = (id) => document.getElementById(id);
+
+let token = localStorage.getItem("zyy_token") || "";
+let conversationId = localStorage.getItem("zyy_conversation") || "";
+let conversations = [];
+
+async function api(path, options = {}) {
+  const response = await fetch("/api" + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "x-zyy-token": token } : {}),
+      ...(options.headers || {})
+    }
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Something went wrong.");
+  }
+
+  return data;
+}
+
+function showMessage(message, sender = "assistant") {
+  const item = document.createElement("div");
+  item.className = "message " +
+    (sender === "user" ? "user-message" : "assistant-message");
+  item.textContent = message;
+  $("messages").appendChild(item);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function setStatus(message) {
+  $("status").textContent = message;
+}
+
+async function sendMessage() {
+  const input = $("messageInput");
+  const message = input.value.trim();
+
+  if (!message) return;
+
+  showMessage(message, "user");
+  input.value = "";
+  $("sendButton").disabled = true;
+  setStatus("ZYY is thinking...");
+
+  try {
+    const result = await api("/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        conversationId,
+        clientTime: new Date().toISOString()
+      })
+    });
+
+    conversationId = result.conversationId || conversationId;
+    localStorage.setItem("zyy_conversation", conversationId);
+
+    const reply = result.reply || result.message || "I couldn't create a reply.";
+    showMessage(reply);
+    setStatus("Ready for you, Boss");
+
+    if ($("autoSpeak")?.checked) speak(reply);
+  } catch (error) {
+    showMessage("I couldn't connect: " + error.message);
+    setStatus("Connection problem");
+  } finally {
+    $("sendButton").disabled = false;
+    input.focus();
+  }
+}
+
+function speak(message) {
+  if (!("speechSynthesis" in window)) {
+    showMessage("Voice playback isn't supported in this browser.");
+    return;
+  }
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(message);
+  const voices = speechSynthesis.getVoices();
+
+  const preferred = voices.find(v =>
+    /samantha|ava|karen|victoria|allison|susan|zira/i.test(v.name)
+  );
+
+  if (preferred) utterance.voice = preferred;
+  utterance.rate = Number($("speechRate")?.value || 1);
+
+  speechSynthesis.speak(utterance);
+}
+
+function startListening() {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    showMessage("Voice input isn't supported in this browser. You can still type.");
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+
+  $("voiceBanner").hidden = false;
+  $("voiceBanner").textContent = "Listening...";
+
+  recognition.onresult = (event) => {
+    $("messageInput").value = event.results[0][0].transcript;
+    $("voiceBanner").hidden = true;
+  };
+
+  recognition.onerror = () => {
+    $("voiceBanner").hidden = true;
+    setStatus("Voice input unavailable");
+  };
+
+  recognition.onend = () => {
+    $("voiceBanner").hidden = true;
+  };
+
+  recognition.start();
+}
+
+function newChat() {
+  conversationId = "";
+  localStorage.removeItem("zyy_conversation");
+  $("messages").innerHTML = "";
+  showMessage("Hello Boss! What would you like to talk about?");
+}
+
+function showView(viewId) {
+  ["chatView", "memoryView", "profileView", "settingsView"].forEach(id => {
+    $(id).hidden = id !== viewId;
+  });
+
+  document.querySelectorAll("nav button").forEach(button => {
+    button.classList.toggle("active", button.dataset.view === viewId);
+  });
+}
+
+async function loadMemories() {
+  try {
+    const data = await api("/memories");
+    const memories = data.memories || [];
+
+    $("memoryList").innerHTML = "";
+
+    memories.forEach(memory => {
+      const item = document.createElement("p");
+      item.textContent = memory.content || memory.text || "";
+      $("memoryList").appendChild(item);
+    });
+  } catch (error) {
+    $("memoryList").textContent = "Memories could not be loaded.";
+  }
+}
+
+async function loadReminders() {
+  try {
+    const data = await api("/reminders");
+    $("reminderList").innerHTML = "";
+
+    (data.reminders || []).forEach(reminder => {
+      const item = document.createElement("p");
+      item.textContent = reminder.text || reminder.title || "";
+      $("reminderList").appendChild(item);
+    });
+  } catch (error) {
+    $("reminderList").textContent = "Reminders could not be loaded.";
+  }
+}
+
+async function saveMemory() {
+  const content = $("memoryInput").value.trim();
+  if (!content) return;
+
+  try {
+    await api("/memories", {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+
+    $("memoryInput").value = "";
+    $("memoryModal").hidden = true;
+    await loadMemories();
+  } catch (error) {
+    alert("Couldn't save memory: " + error.message);
+  }
+}
+
+async function loadProfile() {
+  try {
+    const data = await api("/profile");
+    const profile = data.profile || data;
+
+    $("profileName").value = profile.name || profile.ownerName || "";
+    $("profileBio").value = profile.bio || "";
+    $("profileGoals").value = profile.goals || "";
+    $("profilePreferences").value = profile.preferences || "";
+    $("profileHumor").value = profile.humor || "";
+  } catch (error) {
+    console.log("Profile not loaded:", error.message);
+  }
+}
+
+async function saveProfile() {
+  try {
+    await api("/profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        name: $("profileName").value,
+        bio: $("profileBio").value,
+        goals: $("profileGoals").value,
+        preferences: $("profilePreferences").value,
+        humor: $("profileHumor").value
+      })
+    });
+
+    alert("Profile saved.");
+  } catch (error) {
+    alert("Couldn't save profile: " + error.message);
+  }
+}
+
+async function loadSettings() {
+  try {
+    const data = await api("/settings");
+    const settings = data.settings || data;
+
+    if (settings.theme) $("themeSelect").value = settings.theme;
+    if (settings.provider) $("providerSelect").value = settings.provider;
+    if (settings.model) $("modelInput").value = settings.model;
+
+    $("autoMemory").checked = settings.autoMemory !== false;
+    $("autoSpeak").checked = settings.autoSpeak === true;
+  } catch (error) {
+    console.log("Settings not loaded:", error.message);
+  }
+}
+
+async function saveSettings() {
+  try {
+    await api("/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        theme: $("themeSelect").value,
+        provider: $("providerSelect").value,
+        model: $("modelInput").value,
+        autoMemory: $("autoMemory").checked,
+        autoSpeak: $("autoSpeak").checked
+      })
+    });
+
+    document.documentElement.dataset.theme = $("themeSelect").value;
+    alert("Settings saved.");
+  } catch (error) {
+    alert("Couldn't save settings: " + error.message);
+  }
+}
+
+async function loadHistory() {
+  try {
+    const data = await api("/conversations");
+    conversations = data.conversations || [];
+    $("historyList").innerHTML = "";
+
+    conversations.forEach(conversation => {
+      const button = document.createElement("button");
+      button.textContent = conversation.title || "Chat";
+      button.style.display = "block";
+      button.style.width = "100%";
+      button.style.marginBottom = "8px";
+
+      button.addEventListener("click", () => {
+        conversationId = conversation.id;
+        localStorage.setItem("zyy_conversation", conversationId);
+        $("historyDrawer").hidden = true;
+        showMessage("Selected conversation: " + button.textContent);
+      });
+
+      $("historyList").appendChild(button);
+    });
+  } catch (error) {
+    $("historyList").textContent = "History could not be loaded.";
+  }
+}
+
+async function exportData() {
+  try {
+    const response = await fetch("/api/export", {
+      headers: token ? { "x-zyy-token": token } : {}
+    });
+
+    if (!response.ok) throw new Error("Export failed.");
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "zyy-backup.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function registerEvents() {
+  $("sendButton").addEventListener("click", sendMessage);
+
+  $("messageInput").addEventListener("keydown", event => {
+    if (event.key === "Enter") sendMessage();
+  });
+
+  $("micButton").addEventListener("click", startListening);
+  $("newChatButton").addEventListener("click", newChat);
+
+  $("historyButton").addEventListener("click", async () => {
+    $("historyDrawer").hidden = false;
+    await loadHistory();
+  });
+
+  $("closeHistoryButton").addEventListener("click", () => {
+    $("historyDrawer").hidden = true;
+  });
+
+  document.querySelectorAll("nav button").forEach(button => {
+    button.addEventListener("click", () => {
+      showView(button.dataset.view);
+      if (button.dataset.view === "memoryView") {
+        loadMemories();
+        loadReminders();
+      }
+      if (button.dataset.view === "profileView") loadProfile();
+      if (button.dataset.view === "settingsView") loadSettings();
+    });
+  });
+
+  $("addMemoryButton").addEventListener("click", () => {
+    $("memoryModal").hidden = false;
+  });
+
+  $("saveMemoryButton").addEventListener("click", saveMemory);
+
+  $("cancelMemoryButton").addEventListener("click", () => {
+    $("memoryModal").hidden = true;
+  });
+
+  $("saveProfileButton").addEventListener("click", saveProfile);
+  $("saveSettingsButton").addEventListener("click", saveSettings);
+  $("exportButton").addEventListener("click", exportData);
+
+  $("deleteChatsButton").addEventListener("click", () => {
+    alert("Chat deletion needs to be connected to the server first.");
+  });
+}
+
+function bootstrap() {
+  registerEvents();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(console.error);
+  }
+
+  if (token) {
+    setStatus("Ready for you, Boss");
+  } else {
+    setStatus("Ready to connect");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", bootstrap);
