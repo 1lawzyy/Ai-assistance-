@@ -1,0 +1,136 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/styles.css">
+  <title>ZYY — Personal AI</title>
+</head>
+<body>
+
+<header>
+  <h1>ZYY</h1>
+  <p id="status">Ready for you, Boss</p>
+</header>
+
+<main>
+  <section id="chatView">
+    <h2>Your assistant</h2>
+    <div id="messages" class="messages">
+      <div class="message assistant-message">
+        Hello Boss! I'm ZYY. How can I help you today?
+      </div>
+    </div>
+
+    <div id="voiceBanner" hidden>Listening...</div>
+
+    <div id="composer" class="composer">
+      <input id="messageInput" type="text" placeholder="Message ZYY..." autocomplete="off">
+      <button id="micButton" type="button" aria-label="Voice input">🎙️</button>
+      <button id="sendButton" type="button">Send</button>
+    </div>
+
+    <button id="newChatButton" type="button">New chat</button>
+    <button id="historyButton" type="button">History</button>
+  </section>
+
+  <section id="memoryView" hidden>
+    <h2>Memory & Reminders</h2>
+    <input id="memorySearch" type="search" placeholder="Search memories">
+    <div id="memoryList"></div>
+    <button id="addMemoryButton" type="button">Add memory</button>
+    <div id="reminderList"></div>
+  </section>
+
+  <section id="profileView" hidden>
+    <h2>My Profile</h2>
+    <label for="profileName">Name</label>
+    <input id="profileName" placeholder="Your name">
+    <label for="profileBio">About me</label>
+    <textarea id="profileBio" placeholder="Tell ZYY about yourself"></textarea>
+    <label for="profileGoals">Goals</label>
+    <textarea id="profileGoals" placeholder="Your goals"></textarea>
+    <label for="profilePreferences">Preferences</label>
+    <textarea id="profilePreferences" placeholder="Things you like"></textarea>
+    <label for="profileHumor">Humor style</label>
+    <input id="profileHumor" placeholder="Your preferred humor">
+    <button id="saveProfileButton" type="button">Save profile</button>
+  </section>
+
+  <section id="settingsView" hidden>
+    <h2>Settings</h2>
+
+    <label for="themeSelect">Theme</label>
+    <select id="themeSelect">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+
+    <label for="providerSelect">AI provider</label>
+    <select id="providerSelect">
+      <option value="gemini">Gemini</option>
+      <option value="groq">Groq</option>
+    </select>
+
+    <label for="modelInput">AI model</label>
+    <input id="modelInput" placeholder="Model name">
+
+    <label>
+      <input id="autoMemory" type="checkbox">
+      Allow automatic memory
+    </label>
+
+    <label>
+      <input id="autoSpeak" type="checkbox">
+      Speak replies automatically
+    </label>
+
+    <label for="voiceSelect">Voice</label>
+    <select id="voiceSelect">
+      <option value="female">Female-sounding voice</option>
+      <option value="default">Default voice</option>
+    </select>
+
+    <label for="speechRate">Speech speed</label>
+    <input id="speechRate" type="range" min="0.7" max="1.3" step="0.1" value="1">
+
+    <button id="saveSettingsButton" type="button">Save settings</button>
+    <button id="exportButton" type="button">Export data</button>
+    <button id="deleteChatsButton" type="button">Delete chats</button>
+  </section>
+</main>
+
+<nav>
+  <button class="active" data-view="chatView">Chat</button>
+  <button data-view="memoryView">Memory</button>
+  <button data-view="profileView">Profile</button>
+  <button data-view="settingsView">Settings</button>
+</nav>
+
+<div id="historyDrawer" class="drawer" hidden>
+  <h2>Chat history</h2>
+  <div id="historyList"></div>
+  <button id="closeHistoryButton" type="button">Close</button>
+</div>
+
+<div id="memoryModal" class="modal" hidden>
+  <h2>Add a memory</h2>
+  <textarea id="memoryInput" placeholder="What should ZYY remember?"></textarea>
+  <button id="saveMemoryButton" type="button">Save</button>
+  <button id="cancelMemoryButton" type="button">Cancel</button>
+</div>
+
+<div id="pinModal" class="modal" hidden>
+  <h2>Welcome back</h2>
+  <input id="pinInput" type="password" placeholder="Enter PIN">
+  <button id="unlockButton" type="button">Unlock</button>
+</div>
+
+<script src="/app.js" defer></script>
+</body>
+</html>
